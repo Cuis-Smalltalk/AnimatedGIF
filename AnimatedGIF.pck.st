@@ -1,6 +1,6 @@
-'From Cuis 5.0 [latest update: #4963] on 24 November 2021 at 10:36:58 am'!
+'From Cuis 5.0 [latest update: #4963] on 24 November 2021 at 10:42:49 am'!
 'Description '!
-!provides: 'AnimatedGIF' 1 0!
+!provides: 'AnimatedGIF' 1 1!
 SystemOrganization addCategory: 'AnimatedGIF'!
 
 
@@ -12,16 +12,6 @@ ImageReadWriter subclass: #GIFReadWriter
 	category: 'AnimatedGIF'!
 !classDefinition: 'GIFReadWriter class' category: 'AnimatedGIF'!
 GIFReadWriter class
-	instanceVariableNames: ''!
-
-!classDefinition: #AnimatedImageCompMorph category: 'AnimatedGIF'!
-WidgetMorph subclass: #AnimatedImageCompMorph
-	instanceVariableNames: 'frames frameStream currentFrame activeForm prevFrame currentDisposal'
-	classVariableNames: ''
-	poolDictionaries: ''
-	category: 'AnimatedGIF'!
-!classDefinition: 'AnimatedImageCompMorph class' category: 'AnimatedGIF'!
-AnimatedImageCompMorph class
 	instanceVariableNames: ''!
 
 !classDefinition: #AnimatedImageMorph category: 'AnimatedGIF'!
@@ -98,13 +88,6 @@ For reading GIF files, I take a binary filestream and set my own `frames` variab
 NOTE: I make use of the LzwGifDecoder and LzwGifEncoder classes in order to encode/decode individual bitmap data for each image frame of the GIF.
 
 See `GIFReadWriter exampleAnim` for more information.  !
-
-!AnimatedImageCompMorph commentStamp: 'EG 11/22/2021 18:17:43' prior: 0!
-I am a single frame in a sequence of frames that comprise an animated image. I am designed for use by classes like AnimatedImageMorph and am created during the reading of some image files such as GIFs (see GIFReadWriter).
-
-I contain a Form describing my image, a delay time in milliseconds that describes how long I should be displayed in a sequence of animated frames, and a disposal symbol that implementors can use when compositing myself in a sequence of frames. 
-
-See AnimatedImageMorph for examples of how I am used.!
 
 !GIFFrameCompiler commentStamp: 'EG 11/22/2021 18:20:26' prior: 0!
 I am a utility object that takes a collection of AnimatedImageFrames and compiles an output collection of composited Forms, based on the disposal and blending rules specified by the frames. I am primarily designed to be used with AnimatedImageMorph (rather than AnimatedImageCompMorph), which takes a sequence of Forms and animates them using Morph stepping.
@@ -270,62 +253,6 @@ typicalFileExtensions	"Answer a collection of file extensions (lowercase) which
 
 !GIFReadWriter class methodsFor: 'image reading/writing'!
 wantsToHandleGIFs	^ true! !
-
-!AnimatedImageCompMorph methodsFor: 'drawing' stamp: 'EG 11/21/2021 10:30:33'!
-drawOn: aCanvas	"currentFrame ifNil: [ ^ self ]."	aCanvas		image: activeForm		at: self morphLocalBounds origin.! !
-
-!AnimatedImageCompMorph methodsFor: 'drawing' stamp: 'EG 11/21/2021 10:48:49'!
-leaveCurrent	"Update the activeForm using the #leaveCurrent	disposal method"	| canvas |	canvas := BitBltCanvas onForm: activeForm.	canvas		image: currentFrame form		at: currentFrame offset.		activeForm := canvas form.! !
-
-!AnimatedImageCompMorph methodsFor: 'drawing' stamp: 'EG 11/21/2021 11:36:34'!
-restoreBackground	"Update the activeForm using the #restoreBackground	disposal method"	| canvas r |	canvas := BitBltCanvas onForm: activeForm.	r := (prevFrame offset extent: (prevFrame form extent)).		"We restore the area of the previous frame to the backgroundColor.	 Usually this is transparent"	"canvas		clipBy: r		during: [ :c |			c fillColor: self backgroundColor ]."
-	canvas
-		frameAndFillRectangle: r
-		fillColor: Color transparent
-		borderWidth: 0
-		borderColor: `Color transparent`.	"Draw the current frame's form atop the current canvas form"	canvas		image: currentFrame form		at: currentFrame offset.	activeForm := canvas form.! !
-
-!AnimatedImageCompMorph methodsFor: 'drawing' stamp: 'EG 11/21/2021 10:46:39'!
-updateActiveForm	"Update the activeForm of the receiver based upon the	disposal rules of the current and previous frames."	| canvas |	prevFrame		ifNil: [ canvas := BitBltCanvas onForm: (Form extent: self morphLocalBounds extent depth: currentFrame form depth).			canvas image: currentFrame form at: currentFrame offset.			activeForm := canvas form.			^ self			].	prevFrame disposal = #leaveCurrent		ifTrue: [ ^ self leaveCurrent ].	"Otherwise we assume a restore background"	^ self restoreBackground! !
-
-!AnimatedImageCompMorph methodsFor: 'initialization' stamp: 'EG 11/21/2021 10:26:18'!
-initialize	super initialize.	self color: Color transparent.	frames := OrderedCollection new.	currentDisposal := #restoreBackground.	activeForm := Form extent: self morphExtent.! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-backgroundColor	^ self color! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-backgroundColor: aColor	self color: aColor.! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-currentFrame	^ currentFrame! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-forms	^ frames collect: [ :frame | frame form ].! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-frameStream	^ frameStream! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-frames	^ frames! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-frames: aCollection	"A collection of AnimagedImageFrame instances"	frames := aCollection.	frameStream := ReadStream on: frames.! !
-
-!AnimatedImageCompMorph methodsFor: 'accessing'!
-prevFrame	^ prevFrame! !
-
-!AnimatedImageCompMorph methodsFor: 'stepping' stamp: 'EG 11/21/2021 10:57:04'!
-step	frameStream ifNil: [ ^ self ].	frameStream atEnd ifTrue: [ 		frameStream reset.		prevFrame := nil.		currentFrame := frameStream next.		currentDisposal := #restoreBackground.		self			updateActiveForm			changed.		^ self ].	(frameStream position = 0) ifTrue: [ 		prevFrame := nil.		currentDisposal := #restoreBackground  ]	ifFalse: [ 		prevFrame := frameStream peekBack.		currentDisposal := prevFrame disposal ].	currentFrame := frameStream next.	self updateActiveForm.	self redrawNeeded! !
-
-!AnimatedImageCompMorph methodsFor: 'stepping'!
-stepTime	frameStream ifNil: [ ^ self defaultDelay ].	^ currentFrame delay.! !
-
-!AnimatedImageCompMorph methodsFor: 'defaults'!
-defaultDelay	^ 100! !
-
-!AnimatedImageCompMorph class methodsFor: 'instance creation' stamp: 'EG 11/21/2021 10:47:12'!
-fromGIFReader: aGIFReader	"Respond with an instance of the receiver	configured from a GIFReader instance"	^ self new		frames: aGIFReader frames;		morphExtent: (aGIFReader canvasWidth)@(aGIFReader canvasHeight);		color: aGIFReader backgroundColor! !
 
 !AnimatedImageMorph methodsFor: 'as yet unclassified' stamp: 'EG 11/22/2021 12:15:07'!
 delay
